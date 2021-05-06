@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package de.hdodenhof.circleimageview;
+package com.activator.circleimageview;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -46,7 +46,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
 @SuppressWarnings("UnusedDeclaration")
-public class CircleImageView extends ImageView {
+public class SegmentedCircularProgressBar extends ImageView {
 
     private static final ScaleType SCALE_TYPE = ScaleType.CENTER_CROP;
 
@@ -58,6 +58,11 @@ public class CircleImageView extends ImageView {
     private static final int DEFAULT_CIRCLE_BACKGROUND_COLOR = Color.TRANSPARENT;
     private static final int DEFAULT_IMAGE_ALPHA = 255;
     private static final boolean DEFAULT_BORDER_OVERLAY = false;
+    private static final int DEFAULT_UNREAD_COLOR = Color.LTGRAY;
+    private static final int DEFAULT_READ_COLOR = Color.DKGRAY;
+    private static final int DEFAULT_PROGRESS_BACKGROUND_COLOR = Color.TRANSPARENT;
+    private static final float DEFAULT_STROKE_WIDTH = 5f;
+    private static final float DEFAULT_GAP = 15f;
 
     private final RectF mDrawableRect = new RectF();
     private final RectF mBorderRect = new RectF();
@@ -71,6 +76,11 @@ public class CircleImageView extends ImageView {
     private int mBorderWidth = DEFAULT_BORDER_WIDTH;
     private int mCircleBackgroundColor = DEFAULT_CIRCLE_BACKGROUND_COLOR;
     private int mImageAlpha = DEFAULT_IMAGE_ALPHA;
+    private int mReadColor = DEFAULT_READ_COLOR;
+    private int mUnreadColor = DEFAULT_UNREAD_COLOR;
+    private int mProgressBackgroundColor = DEFAULT_PROGRESS_BACKGROUND_COLOR;
+    private float mGap = DEFAULT_GAP;
+    private float mStrokeWidth = DEFAULT_STROKE_WIDTH;
 
     private Bitmap mBitmap;
     private Canvas mBitmapCanvas;
@@ -84,28 +94,34 @@ public class CircleImageView extends ImageView {
     private boolean mRebuildShader;
     private boolean mDrawableDirty;
 
+    private boolean mDrawProgressBar;
+
     private boolean mBorderOverlay;
     private boolean mDisableCircularTransformation;
 
-    public CircleImageView(Context context) {
+    private int mUnreadCount = 1;
+    private int mReadCount = 0;
+
+
+    public SegmentedCircularProgressBar(Context context) {
         super(context);
 
         init();
     }
 
-    public CircleImageView(Context context, AttributeSet attrs) {
+    public SegmentedCircularProgressBar(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
     }
 
-    public CircleImageView(Context context, AttributeSet attrs, int defStyle) {
+    public SegmentedCircularProgressBar(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
 
-        TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.CircleImageView, defStyle, 0);
+        TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.SegmentedCircularProgressBar, defStyle, 0);
 
-        mBorderWidth = a.getDimensionPixelSize(R.styleable.CircleImageView_civ_border_width, DEFAULT_BORDER_WIDTH);
-        mBorderColor = a.getColor(R.styleable.CircleImageView_civ_border_color, DEFAULT_BORDER_COLOR);
-        mBorderOverlay = a.getBoolean(R.styleable.CircleImageView_civ_border_overlay, DEFAULT_BORDER_OVERLAY);
-        mCircleBackgroundColor = a.getColor(R.styleable.CircleImageView_civ_circle_background_color, DEFAULT_CIRCLE_BACKGROUND_COLOR);
+        mBorderWidth = a.getDimensionPixelSize(R.styleable.SegmentedCircularProgressBar_civ_border_width, DEFAULT_BORDER_WIDTH);
+        mBorderColor = a.getColor(R.styleable.SegmentedCircularProgressBar_civ_border_color, DEFAULT_BORDER_COLOR);
+        mBorderOverlay = a.getBoolean(R.styleable.SegmentedCircularProgressBar_civ_border_overlay, DEFAULT_BORDER_OVERLAY);
+        mCircleBackgroundColor = a.getColor(R.styleable.SegmentedCircularProgressBar_civ_circle_background_color, DEFAULT_CIRCLE_BACKGROUND_COLOR);
 
         a.recycle();
 
@@ -151,6 +167,16 @@ public class CircleImageView extends ImageView {
         }
     }
 
+    private Paint setProgressPaint(){
+        Paint paint = new Paint();
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setColor(mProgressBackgroundColor);
+        paint.setStrokeWidth(mStrokeWidth);
+        paint.setAntiAlias(true);
+
+        return paint;
+    }
+
     @SuppressLint("CanvasSize")
     @Override
     protected void onDraw(Canvas canvas) {
@@ -159,15 +185,58 @@ public class CircleImageView extends ImageView {
             return;
         }
 
+        if(mDrawProgressBar){
+
+            RectF rect = new RectF(mDrawableRect.left + mGap + mStrokeWidth ,mDrawableRect.top + mGap + mStrokeWidth,mDrawableRect.right + mGap + mStrokeWidth,mDrawableRect.bottom + mGap + mStrokeWidth );
+            Paint arcPaint = setProgressPaint();
+            if (mProgressBackgroundColor != Color.TRANSPARENT){
+                canvas.drawArc(rect,-90f,360f,false,arcPaint);
+            }
+            float individualRadii = (float) 360/(mUnreadCount+mReadCount);
+            float startRadii = -90f;
+            float arcRadii = 360f;
+            float arcRadiiGap = 10f;
+
+
+            if(mReadCount+mUnreadCount > 1){
+                arcPaint.setColor(mReadColor);
+                for(int i = 0; i< mReadCount; i++){
+                    startRadii = (i*individualRadii)+ (arcRadiiGap) -90f;
+                    canvas.drawArc(rect,startRadii, arcRadii-arcRadiiGap,false,arcPaint);
+                }
+
+                arcPaint.setColor(mUnreadColor);
+                for(int i = mReadCount; i< mReadCount+mUnreadCount; i++){
+                    startRadii = (i*individualRadii)+ (arcRadiiGap) -90f;
+                    canvas.drawArc(rect,startRadii, arcRadii-arcRadiiGap,false,arcPaint);
+                }
+            }
+            else if(mReadCount ==1){
+                arcPaint.setColor(mReadColor);
+                canvas.drawArc(rect,-90,360,false,arcPaint);
+            }
+            else {
+                arcPaint.setColor(mUnreadColor);
+                canvas.drawArc(rect,-90,360,false,arcPaint);
+            }
+
+
+
+        }
+
+
+
         if (mCircleBackgroundColor != Color.TRANSPARENT) {
             canvas.drawCircle(mDrawableRect.centerX(), mDrawableRect.centerY(), mDrawableRadius, mCircleBackgroundPaint);
         }
+
+
 
         if (mBitmap != null) {
             if (mDrawableDirty && mBitmapCanvas != null) {
                 mDrawableDirty = false;
                 Drawable drawable = getDrawable();
-                drawable.setBounds(0, 0, mBitmapCanvas.getWidth(), mBitmapCanvas.getHeight());
+                drawable.setBounds(0, 0, (int) (mBitmapCanvas.getWidth() - mStrokeWidth -mGap), (int) (mBitmapCanvas.getHeight() - mStrokeWidth - mGap));
                 drawable.draw(mBitmapCanvas);
             }
 
@@ -181,6 +250,7 @@ public class CircleImageView extends ImageView {
             }
 
             canvas.drawCircle(mDrawableRect.centerX(), mDrawableRect.centerY(), mDrawableRadius, mBitmapPaint);
+
         }
 
         if (mBorderWidth > 0) {
@@ -255,6 +325,8 @@ public class CircleImageView extends ImageView {
         return mBorderWidth;
     }
 
+
+
     public void setBorderWidth(int borderWidth) {
         if (borderWidth == mBorderWidth) {
             return;
@@ -279,6 +351,17 @@ public class CircleImageView extends ImageView {
         updateDimensions();
         invalidate();
     }
+
+    public void setProgressBarStrokeWidth(float mStrokeWidth){
+        this.mStrokeWidth = mStrokeWidth;
+    }
+    public void setReadcount(int readcount){
+        this.mReadCount = readcount;
+    }
+    public void setUnreadCount(int unReadCount){
+        this.mUnreadColor = unReadCount;
+    }
+
 
     public boolean isDisableCircularTransformation() {
         return mDisableCircularTransformation;
@@ -436,8 +519,8 @@ public class CircleImageView extends ImageView {
     }
 
     private RectF calculateBounds() {
-        int availableWidth  = getWidth() - getPaddingLeft() - getPaddingRight();
-        int availableHeight = getHeight() - getPaddingTop() - getPaddingBottom();
+        int availableWidth  = (int) (getWidth() - getPaddingLeft() - getPaddingRight() - mStrokeWidth - mGap);
+        int availableHeight =(int) (getHeight() - getPaddingTop() - getPaddingBottom() - mStrokeWidth - mGap);
 
         int sideLength = Math.min(availableWidth, availableHeight);
 
